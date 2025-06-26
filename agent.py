@@ -1,68 +1,74 @@
 import torch
 import random
 import numpy as np
+
 from collections import deque
 from game import SnakeGameAI, Direction, Point
+from model import Linear_QNet, QTrainer
+from helper import plot
+
 
 MAX_MEMORY = 100_000
 BATCH_SIZE = 1000
-LR = 0.01
+LR = 0.001
 
 class Agent:
 
     def __init__(self):
         self.n_games = 0
         self.epsilon = 0 # randomness
-        self.gamma = 0 # discount rate
+        self.gamma = 0.9 # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # popleft()
-        self.model = None 
-        self.trainer = None
+        self.model = Linear_QNet(11, 256, 3)
+        self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
 
     def get_state(self, game):
-       head = game.snake[0]
-       point_left = Point(head.x - 20, head.y)
-       point_right = Point(head.x + 20, head.y)
-       point_up = Point(head.x, head.y - 20)
-       point_down = Point(head.x, head.y + 20)
+        head = game.snake[0]
+        point_left = Point(head.x - 20, head.y)
+        point_right = Point(head.x + 20, head.y)
+        point_up = Point(head.x, head.y - 20)
+        point_down = Point(head.x, head.y + 20)
 
-       direction_left = game.direction == Direction.LEFT
-       direction_right = game.direction == Direction.RIGHT
-       direction_up = game.direction == Direction.UP
-       direction_down = game.direction == Direction.DOWN
+        direction_left = game.direction == Direction.LEFT
+        direction_right = game.direction == Direction.RIGHT
+        direction_up = game.direction == Direction.UP
+        direction_down = game.direction == Direction.DOWN
 
-       state = [
-           
-           #Danger straight
-           (direction_right and game.is_collision(point_right)) or
-           (direction_left and game.is_collision(point_left)) or
-           (direction_up and game.is_collision(point_up)) or
-           (direction_down and game.is_collision(point_down)),
+        state = [
+
+            #Danger straight
+            (direction_right and game.is_collision(point_right)) or
+            (direction_left and game.is_collision(point_left)) or
+            (direction_up and game.is_collision(point_up)) or
+            (direction_down and game.is_collision(point_down)),
 
             #Danger right
-           (direction_up and game.is_collision(point_right)) or
-           (direction_down and game.is_collision(point_left)) or
-           (direction_left and game.is_collision(point_up)) or
-           (direction_right and game.is_collision(point_down)),
+            (direction_up and game.is_collision(point_right)) or
+            (direction_down and game.is_collision(point_left)) or
+            (direction_left and game.is_collision(point_up)) or
+            (direction_right and game.is_collision(point_down)),
 
             #Danger left
-           (direction_down and game.is_collision(point_right)) or
-           (direction_up and game.is_collision(point_left)) or
-           (direction_right and game.is_collision(point_up)) or
-           (direction_left and game.is_collision(point_down)),
+            (direction_down and game.is_collision(point_right)) or
+            (direction_up and game.is_collision(point_left)) or
+            (direction_right and game.is_collision(point_up)) or
+            (direction_left and game.is_collision(point_down)),
 
-           #Move direction
+            #Move direction
             direction_left,
             direction_right,
             direction_up,
             direction_down,
-        
+
             # food location
             game.food.x < game.head.x, # Food left
-            game.food.x < game.head.x,# food right
-            game.fodd.y < game.head.y, # food up
+            game.food.x > game.head.x,# food right
+            game.food.y < game.head.y, # food up
             game.food.y > game.head.y # food down
-       ]
+        ]
+
+        return np.array(state, dtype=int)
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done)) # popleft if MAX_MEMORY is reached
@@ -82,15 +88,17 @@ class Agent:
     def get_action(self, state):
         # Random moves: tradeoff exploration / exploitation
         self.epsilon = 80 - self.n_games
-        final_move = [0, 0,0]
+        final_move = [0, 0, 0]
         if random.randint(0, 200) < self.epsilon:
             move = random.randint(0, 2)
             final_move[move] = 1
         else:
             state0 = torch.tensor(state, dtype=torch.float)
-            prediction = self.model.predict(state0)
+            prediction = self.model(state0)
             move = torch.argmax(prediction).item()
             final_move[move] = 1
+        
+        return final_move
 
 def train():
     plot_scores = []
@@ -119,13 +127,20 @@ def train():
         if done:
             #train long memory
             game.reset()
-            agent.n_games +=1
+            agent.n_games += 1
             agent.train_long_memory()
 
             if score > record:
                 record = score
+                agent.model.save()
             
             print('Game', agent.n_games, 'Score', score, 'Record', record)
+
+            plot_scores.append(score)
+            total_score += score
+            mean_score = total_score / agent.n_games
+            plot_mean_scores.append(mean_score)
+            plot(plot_scores, plot_mean_scores)
 
 
 

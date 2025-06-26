@@ -23,7 +23,7 @@ BLUE2 = (0, 100, 255)
 BLACK = (0,0,0)
 
 BLOCK_SIZE = 20
-SPEED = 20
+SPEED = 500
 
 class SnakeGameAI:
     
@@ -64,7 +64,7 @@ class SnakeGameAI:
                 quit()
         
         # 2. move
-        self._move(self.move) # update the head
+        self._move(action) # update the head
         self.snake.insert(0, self.head)
         
         # 3. check if game over
@@ -89,12 +89,14 @@ class SnakeGameAI:
         # 6. return game over and score
         return reward, game_over, self.score
     
-    def is_collision(self):
+    def is_collision(self, pt=None):
+        if pt is None:
+            pt = self.head
         # hits boundary
-        if self.head.x > self.w - BLOCK_SIZE or self.head.x < 0 or self.head.y > self.h - BLOCK_SIZE or self.head.y < 0:
+        if pt.x > self.w - BLOCK_SIZE or pt.x < 0 or pt.y > self.h - BLOCK_SIZE or pt.y < 0:
             return True
         # hits itself
-        if self.head in self.snake[1:]:
+        if pt in self.snake[1:]:
             return True
         
         return False
@@ -119,7 +121,7 @@ class SnakeGameAI:
 
         if np.array_equal(action, [1, 0, 0]):
             new_dir = clock_wise[idx]
-        if np.array_equal(action, [0, 1,0]):
+        elif np.array_equal(action, [0, 1, 0]):
             next_idx = (idx + 1) % 4
             new_dir = clock_wise[next_idx]
         else: 
