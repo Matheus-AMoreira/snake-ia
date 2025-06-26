@@ -7,7 +7,9 @@ from game import SnakeGameAI, Direction, Point
 from model import Linear_QNet, QTrainer
 from helper import plot
 
-
+EPSILON_START = 80 # Original starting epsilon
+EPSILON_DECAY_RATE = 0.995 # Decay rate per game
+EPSILON_MIN = 1 # Keep a small exploration rate
 MAX_MEMORY = 100_000
 BATCH_SIZE = 1000
 LR = 0.001
@@ -16,7 +18,7 @@ class Agent:
 
     def __init__(self):
         self.n_games = 0
-        self.epsilon = 0 # randomness
+        self.epsilon = EPSILON_START # randomness
         self.gamma = 0.9 # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # popleft()
         self.model = Linear_QNet(11, 256, 3)
@@ -87,7 +89,7 @@ class Agent:
 
     def get_action(self, state):
         # Random moves: tradeoff exploration / exploitation
-        self.epsilon = 80 - self.n_games
+        self.epsilon = max(EPSILON_MIN, EPSILON_START - self.n_games) # Linear decay as before, but with a min
         final_move = [0, 0, 0]
         if random.randint(0, 200) < self.epsilon:
             move = random.randint(0, 2)
