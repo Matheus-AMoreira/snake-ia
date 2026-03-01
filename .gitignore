@@ -1,0 +1,6 @@
+uv.lock
+.idea
+.venv
+.python-version
+model
+__pycache__
